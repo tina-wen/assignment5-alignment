@@ -15,4 +15,4 @@
 ## 实现与交付
 
 - 针对第 1 类问题，全部函数实现在 [`function.py`](https://github.com/tina-wen/assignment5-alignment/blob/main/function.py) 中，并通过 [`adapters.py`](https://github.com/tina-wen/assignment5-alignment/blob/main/tests/adapters.py) 的测试接口进行转发。
-- 针对第 2、3 类问题，实现脚本提供在目录下，评估结果请参见 `writeup.pdf`(to be updated)。
+- 针对第 2、3 类问题，主要实现参考 `grpo_experiments*.py`，评估结果请参见 `writeup.pdf`(to be updated)。
