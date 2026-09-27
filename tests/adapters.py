@@ -382,7 +382,9 @@ def get_packed_sft_dataset(
         "input_ids" contains the token IDs for the language modeling inputs, and "labels" contains
         the token IDs for the language modeling labels.
     """
-    raise NotImplementedError
+    from supplement import Dataset
+    dataset = Dataset(tokenizer, dataset_path, seq_length, shuffle)
+    return dataset
 
 
 def run_iterate_batches(
@@ -405,7 +407,8 @@ def run_iterate_batches(
     Returns:
         Iterable over batches, where each batch has size `batch_size`.
     """
-    raise NotImplementedError
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size, shuffle)
+    return dataloader
 
 
 def run_parse_mmlu_response(
