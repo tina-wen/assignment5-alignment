@@ -75,3 +75,53 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self,i):
         return {"input_ids": self.inputs[i,:], "labels": self.labels[i,:]}
+
+
+def compute_dpo_loss(
+    lm: torch.nn.Module,
+    lm_ref: torch.nn.Module,
+    tokenizer,
+    beta: float,
+    prompt: str,
+    response_chosen: str,
+    response_rejected: str,
+) -> torch.Tensor:
+    from function import get_response_log_probs
+    device = next(lm.parameters()).device
+    data = [
+        {"instruction": prompt, "response": response_chosen},
+        {"instruction": prompt, "response": response_rejected},
+        ]
+
+    template = Path('./cs336_alignment/prompts_safety/alpaca_sft.prompt').read_text(encoding='utf-8').strip()
+    # 计算prompt的长度，隐式获得response_mask
+    prefix = template.format(
+        instruction = prompt,
+        response = '',
+    )
+    prefix_len = len(tokenizer.encode(prefix))
+
+    # 计算成对log_prob
+    inputs = [template.format(**d) for d in data]
+
+    log_prob_diffs = [] # [chosen_diff, rejected_diff]
+    for input in inputs:
+        tokens = tokenizer.encode(input)
+        tokens.append(tokenizer.eos_token_id)
+        input_id,label = tokens[:-1], tokens[1:]
+        log_prob = get_response_log_probs(
+            lm, 
+            torch.tensor(input_id, dtype = torch.int64).unsqueeze(0).to(device), 
+            torch.tensor(label, dtype = torch.int64).unsqueeze(0).to(device),
+            )['log_probs']
+        ref_log_prob = get_response_log_probs(
+            lm_ref, 
+            torch.tensor(input_id, dtype = torch.int64).unsqueeze(0).to(device), 
+            torch.tensor(label, dtype = torch.int64).unsqueeze(0).to(device),
+            )['log_probs']
+        log_prob_diff = log_prob[:, prefix_len-1:].sum() - ref_log_prob[:, prefix_len-1:].sum()
+        log_prob_diffs.append(log_prob_diff)
+
+    return -torch.log(torch.sigmoid((log_prob_diffs[0] - log_prob_diffs[1]) * beta))
+
+
