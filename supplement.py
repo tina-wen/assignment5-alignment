@@ -4,6 +4,7 @@ import json
 import torch
 import random
 from pathlib import Path
+from function import tokenize_prompt_and_output, get_response_log_probs
 
 def parse_mmlu_response(
     mmlu_example: dict[str, Any],
@@ -86,42 +87,46 @@ def compute_dpo_loss(
     response_chosen: str,
     response_rejected: str,
 ) -> torch.Tensor:
-    from function import get_response_log_probs
+    
     device = next(lm.parameters()).device
-    data = [
-        {"instruction": prompt, "response": response_chosen},
-        {"instruction": prompt, "response": response_rejected},
-        ]
+    ref_device = next(lm_ref.parameters()).device
 
     template = Path('./cs336_alignment/prompts_safety/alpaca_sft.prompt').read_text(encoding='utf-8').strip()
-    # 计算prompt的长度，隐式获得response_mask
+    # 获得prompt
     prefix = template.format(
         instruction = prompt,
         response = '',
     )
-    prefix_len = len(tokenizer.encode(prefix))
 
-    # 计算成对log_prob
-    inputs = [template.format(**d) for d in data]
+    # [chosen, rejected]
+    inputs = tokenize_prompt_and_output(
+        [prefix]*2,
+        [response_chosen + tokenizer.eos_token, response_rejected + tokenizer.eos_token],
+        tokenizer
+        )
+    input_ids, labels, mask = inputs["input_ids"], inputs["labels"], inputs["response_mask"] 
 
-    log_prob_diffs = [] # [chosen_diff, rejected_diff]
-    for input in inputs:
-        tokens = tokenizer.encode(input)
-        tokens.append(tokenizer.eos_token_id)
-        input_id,label = tokens[:-1], tokens[1:]
-        log_prob = get_response_log_probs(
-            lm, 
-            torch.tensor(input_id, dtype = torch.int64).unsqueeze(0).to(device), 
-            torch.tensor(label, dtype = torch.int64).unsqueeze(0).to(device),
-            )['log_probs']
-        ref_log_prob = get_response_log_probs(
+    log_prob_pair = get_response_log_probs(
+        lm, 
+        input_ids.to(device), 
+        labels.to(device),
+        )['log_probs']
+    
+    with torch.no_grad():
+        ref_log_prob_pair = get_response_log_probs(
             lm_ref, 
-            torch.tensor(input_id, dtype = torch.int64).unsqueeze(0).to(device), 
-            torch.tensor(label, dtype = torch.int64).unsqueeze(0).to(device),
+            input_ids.to(ref_device), 
+            labels.to(ref_device),
             )['log_probs']
-        log_prob_diff = log_prob[:, prefix_len-1:].sum() - ref_log_prob[:, prefix_len-1:].sum()
-        log_prob_diffs.append(log_prob_diff)
 
-    return -torch.log(torch.sigmoid((log_prob_diffs[0] - log_prob_diffs[1]) * beta))
+    log_probs = (log_prob_pair * mask.to(device)).sum(dim = -1) # (2,)
+    ref_log_probs = (ref_log_prob_pair * mask.to(ref_device)).sum(dim = -1).to(device) 
+    
+    diff = beta * torch.matmul(
+        torch.tensor([1.0,-1.0], dtype=log_probs.dtype, device = device), 
+        (log_probs - ref_log_probs))
+
+    loss = -torch.log(torch.sigmoid(diff))
+    return loss
 
 
