@@ -382,7 +382,7 @@ def get_packed_sft_dataset(
         "input_ids" contains the token IDs for the language modeling inputs, and "labels" contains
         the token IDs for the language modeling labels.
     """
-    from supplement import Dataset
+    from cs336_alignment.sft_dataset import Dataset
     dataset = Dataset(tokenizer, dataset_path, seq_length, shuffle)
     return dataset
 
@@ -488,5 +488,5 @@ def run_compute_per_instance_dpo_loss(
     Returns:
         torch.Tensor with the DPO loss for this example.
     """
-    from supplement import compute_dpo_loss
+    from cs336_alignment.dpo import compute_dpo_loss
     return compute_dpo_loss(lm, lm_ref, tokenizer, beta, prompt, response_chosen, response_rejected)

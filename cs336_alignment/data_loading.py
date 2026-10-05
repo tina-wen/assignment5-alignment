@@ -5,7 +5,13 @@ from pathlib import Path
 import gzip
 from typing import Any
 
-def load_dataset(data_dir: str, add_src: str | None = None) -> list[dict[str, Any]]:
+DATA_PATH = 'data/'
+PROMPT_PATH = 'cs336_alignment/'
+
+def load_dataset(
+        data_dir: str, 
+        add_src: str | None = None, 
+        ) -> list[dict[str, Any]]:
     if data_dir.endswith('.json'):
         with open(data_dir,'r',encoding='utf-8') as f:
             data = json.load(f)
@@ -52,3 +58,14 @@ def get_prompts(data: list[dict[str,Any]], prompt_dir: str) -> list[str]:
     template = Path(prompt_dir).read_text(encoding='utf-8').strip()
     prompts = [template.format(**d) for d in data]
     return prompts
+
+
+alpaca_sft_prompt_dir = os.path.join(PROMPT_PATH, 'prompts_safety', 'alpaca_sft' + '.prompt')
+alpaca_sft_template = Path(alpaca_sft_prompt_dir).read_text(encoding='utf-8').strip()
+
+def get_alpaca_sft_prefix(prompt: str) -> str:
+    prefix = alpaca_sft_template.format(
+        instruction = prompt,
+        response = '',
+    ) 
+    return prefix

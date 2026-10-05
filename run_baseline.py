@@ -1,14 +1,13 @@
 import os
 from typing import Any, Callable
 
-from cs336_alignment.data_loading import load_dataset, load_mmlu, get_prompts, load_simple_safety_tests
+from cs336_alignment.data_loading import PROMPT_PATH, DATA_PATH, load_dataset, load_mmlu, get_prompts, load_simple_safety_tests
 from cs336_alignment.response_scoring import gsm8k_reward_fn, mmlu_reward_fn, score_responses, dump_output
 from cs336_alignment.vllm_utils import generate_with_vllm
 from cs336_alignment.drgrpo_grader import question_only_reward_fn, r1_zero_reward_fn
 # 我将要建立一个pipeline：
 
-DATA_PATH = 'data/'
-PROMPT_PATH = 'cs336_alignment/'
+
 MODEL_PATH = '../../weights'
 OUTPUT_PATH = './vLLM_outputs'
 
