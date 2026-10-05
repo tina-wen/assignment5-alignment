@@ -15,6 +15,8 @@ from dataclasses import dataclass
 
 import torch
 
+from typing import Any
+
 logger = logging.getLogger(__name__)
 
 
@@ -290,3 +292,26 @@ def sync_policy_weights(policy: torch.nn.Module, vllm_base_url: str, weight_sync
         update_future.result()
     _http_json("POST", f"{vllm_base_url}/reset_prefix_cache", timeout=60)
     _http_json("POST", f"{vllm_base_url}/resume", timeout=60)
+
+def generate_with_vllm(
+        model_dir, 
+        prompts: list[str],
+        sampling_params: dict[str, Any], 
+        gpu_memory_utilization: float,
+        ) -> tuple[list[str], float]:
+    # 基于prompts批量推理
+    vllm_server = VLLMServer(
+        model_id=model_dir,
+        seed=sampling_params.get("seed"),
+        gpu=0,
+        gpu_memory_utilization=gpu_memory_utilization,
+        )
+    vllm_server.start()
+    start_time = time.perf_counter()
+    responses = vllm_server.generate_completions(prompts,sampling_params=sampling_params)
+    responses = [r.text for r in responses]
+    generation_seconds = time.perf_counter() - start_time
+    throughput = len(prompts) / generation_seconds
+    return responses, throughput
+
+    
