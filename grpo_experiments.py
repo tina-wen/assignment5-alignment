@@ -124,7 +124,7 @@ def RLTrain(
                 mini_old_log_probs = old_log_probs[mini_train_step]
 
             # grpo_train
-            total_loss,grad_norm,info = grpo_train_step(
+            total_loss, info = grpo_train_step(
                 model,
                 tokenizer,
                 optimizer,
@@ -145,7 +145,7 @@ def RLTrain(
             )
             wandb.log({
                 "loss": total_loss,
-                "grad_norm": grad_norm,
+                "grad_norm": info.get("grad_norm", None),
                 "clip_frac": info.get("clip_frac",None),
                 "train/response_len": info.get("response_len",None),
                 "train/mean_rewards": info.get("mean_rewards",None),

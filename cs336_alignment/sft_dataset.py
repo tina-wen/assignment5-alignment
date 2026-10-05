@@ -15,10 +15,10 @@ class Dataset(torch.utils.data.Dataset):
         if shuffle:
             random.shuffle(text_list)
 
-        all_text = tokenizer.eos_token.join(text_list)
-        all_text += tokenizer.eos_token
-
-        tokens = tokenizer.encode(all_text) # list[int]
+        tokens = []
+        for text in text_list:
+            tokens.extend(tokenizer.encode(text))
+            tokens.append(tokenizer.eos_token_id)
 
         inputs = tokens[:-1]
         labels = tokens[1:]

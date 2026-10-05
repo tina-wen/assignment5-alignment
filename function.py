@@ -100,19 +100,31 @@ def compute_policy_gradient_loss(
         unclipped_adv = advantages * resample_ratio
 
         clipped_tokens = (resample_ratio > 1+cliprange) | (resample_ratio < 1-cliprange)
-        num_clip_token = torch.sum(clipped_tokens*response_mask)
+        if response_mask is not None:
+            num_clip_token = torch.sum(clipped_tokens * response_mask)
+        else:
+            num_clip_token = torch.sum(clipped_tokens)
         resample_ratio = torch.clamp(resample_ratio, min=1-cliprange, max=1+cliprange)
         clipped_adv = advantages * resample_ratio
         return -torch.minimum(unclipped_adv, clipped_adv), {"num_clip_token": num_clip_token}
 
     if importance_reweighting_method == "gspo":
-        resample_ratio = torch.exp(
-            torch.sum(
-                (policy_log_probs - old_log_probs) * response_mask, 
-                dim = -1,
-                keepdim=True,
-                ) 
-                / torch.maximum(torch.sum(response_mask, dim = -1, keepdim=True),torch.ones((response_mask.shape[0],1),device=response_mask.device)))
+        if response_mask is not None:
+            resample_ratio = torch.exp(
+                torch.sum(
+                    (policy_log_probs - old_log_probs) * response_mask, 
+                    dim = -1,
+                    keepdim=True,
+                    ) 
+                    / torch.maximum(torch.sum(response_mask, dim = -1, keepdim=True),torch.ones((response_mask.shape[0],1),device=response_mask.device)))
+        else:
+            resample_ratio = torch.exp(
+                torch.mean(
+                    policy_log_probs - old_log_probs,
+                    dim = -1,
+                    keepdim = True,
+                )
+            )
         unclipped_adv = advantages * resample_ratio
         clipped_sample = (resample_ratio > 1+cliprange) | (resample_ratio < 1-cliprange)
         num_clip_sample = torch.sum(clipped_sample)
@@ -175,7 +187,7 @@ def grpo_train_step(
         if old_log_probs is not None:
             old_log_probs = old_log_probs[mask]
         if advantages.shape[0] < gradient_accumulation_steps:
-            return 0,0,{}
+            return 0,{"grad_norm": 0}
 
     batch_size = input_ids.shape[0]
     micro_batch_size = batch_size // gradient_accumulation_steps
@@ -225,6 +237,11 @@ def grpo_train_step(
     elif importance_reweighting_method == "gspo":
         mean_rewards_info.update({"clip_frac": num_clips / batch_size})
 
-    mean_rewards_info.update({"response_len":torch.sum(response_mask) / response_mask.shape[0]})
+    mean_rewards_info.update(
+        {
+            "grad_norm": grad_norm, 
+            "response_len": torch.sum(response_mask) / response_mask.shape[0],
+            }
+            )
 
-    return total_loss,grad_norm,mean_rewards_info
+    return total_loss,mean_rewards_info

@@ -9,9 +9,13 @@ DATA_PATH = 'data/'
 PROMPT_PATH = 'cs336_alignment/'
 
 def load_dataset(
-        data_dir: str, 
+        data_dir: str | os.PathLike[str], 
         add_src: str | None = None, 
         ) -> list[dict[str, Any]]:
+
+    if not isinstance(data_dir, str):
+        data_dir = os.fspath(data_dir)
+    
     if data_dir.endswith('.json'):
         with open(data_dir,'r',encoding='utf-8') as f:
             data = json.load(f)
@@ -44,7 +48,7 @@ def load_simple_safety_tests(data_dir):
 def load_mmlu(data_dir: str):
     mmlu_examples = []
     for name in os.listdir(data_dir):
-        data = pd.read_csv(os.path.join(data_dir,name),header=None,dtype=str)
+        data = pd.read_csv(os.path.join(data_dir,name),header=None,dtype=str,keep_default_na=False)
         for row in data.itertuples():
             mmlu_examples.append({
                 "subject":name.split('_val')[0],
